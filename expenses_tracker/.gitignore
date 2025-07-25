@@ -4,6 +4,7 @@
 # But keep these:
 !.gitignore
 !lib/
+!lib/**
 !pubspec.yaml
 !pubspec.lock
 !analysis_options.yaml

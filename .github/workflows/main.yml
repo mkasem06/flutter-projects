@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'expenses_tracker/**'
+  workflow_dispatch:
 
 jobs:
   build:

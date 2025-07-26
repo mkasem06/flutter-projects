@@ -51,9 +51,9 @@ flutter run
 ## 💻 Quick Actions
 
 <p align="center">
-  <a href="https://github.com/mkasem06/flutter_projects"><img alt="Star" src="https://img.shields.io/github/stars/mkasem06/flutter-projects?style=for-the-badge&label=Star&logo=github"></a>
-  <a href="https://github.com/mkasem06/flutter_projects/fork"><img alt="Fork" src="https://img.shields.io/github/forks/mkasem06/flutter-projects?style=for-the-badge&label=Fork&logo=github"></a>
-  <a href="https://github.com/mkasem06/flutter_projects/watchers"><img alt="Watch" src="https://img.shields.io/github/watchers/mkasem06/flutter-projects?style=for-the-badge&label=Watch&logo=github"></a>
+  <a href="https://github.com/mkasem06/flutter-projects"><img alt="Star" src="https://img.shields.io/github/stars/mkasem06/flutter-projects?style=for-the-badge&label=Star&logo=github"></a>
+  <a href="https://github.com/mkasem06/flutter-projects/fork"><img alt="Fork" src="https://img.shields.io/github/forks/mkasem06/flutter-projects?style=for-the-badge&label=Fork&logo=github"></a>
+  <a href="https://github.com/mkasem06/flutter-projects/watchers"><img alt="Watch" src="https://img.shields.io/github/watchers/mkasem06/flutter-projects?style=for-the-badge&label=Watch&logo=github"></a>
   <a href="https://github.com/mkasem06/flutter-projects/generate"><img alt="Use this template" src="https://img.shields.io/badge/-Use%20this%20template-blue?style=for-the-badge&logo=github"></a>
 </p>
 

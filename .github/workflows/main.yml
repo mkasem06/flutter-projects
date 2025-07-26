@@ -4,6 +4,10 @@ on:
   push:
     paths:
       - 'expenses_tracker/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -17,16 +21,42 @@ jobs:
     - name: Set up Flutter
       uses: subosito/flutter-action@v2
       with:
-        flutter-version: '3.22.0'
+        flutter-version: '3.32.8'
         channel: stable
 
     - name: Install Dependencies
       run: flutter pub get
       working-directory: expenses_tracker
 
+    - name: Create temporary Flutter project with correct structure
+      run: |
+        # Create a new Flutter project with the correct structure
+        flutter create -t app temp_expenses_tracker
+        
+        # Copy over the important files from the original project
+        cp -r expenses_tracker/lib temp_expenses_tracker/
+        cp expenses_tracker/pubspec.yaml temp_expenses_tracker/
+        cp expenses_tracker/pubspec.lock temp_expenses_tracker/
+        cp -r expenses_tracker/assets temp_expenses_tracker/ || true
+        cp expenses_tracker/analysis_options.yaml temp_expenses_tracker/ || true
+        
+        # Copy any custom Android configuration if needed
+        if [ -f expenses_tracker/android/app/src/main/AndroidManifest.xml ]; then
+          cp expenses_tracker/android/app/src/main/AndroidManifest.xml temp_expenses_tracker/android/app/src/main/
+        fi
+
+    - name: Install dependencies in temp project
+      run: flutter pub get
+      working-directory: temp_expenses_tracker
+
     - name: Build Release APK
       run: flutter build apk --release
-      working-directory: expenses_tracker
+      working-directory: temp_expenses_tracker
+
+    - name: Copy APK to original location
+      run: |
+        mkdir -p expenses_tracker/build/app/outputs/flutter-apk/
+        cp temp_expenses_tracker/build/app/outputs/flutter-apk/app-release.apk expenses_tracker/build/app/outputs/flutter-apk/
 
     - name: Auto-increment Build Number
       id: version

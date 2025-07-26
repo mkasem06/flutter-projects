@@ -1,0 +1,63 @@
+name: Build & Release Expense Tracker APK
+
+on:
+  push:
+    paths:
+      - 'expenses_tracker/**'
+
+jobs:
+  build:
+    name: Build APK and Release
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v3
+
+    - name: Set up Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.22.0'
+        channel: stable
+
+    - name: Install Dependencies
+      run: flutter pub get
+      working-directory: expenses_tracker
+
+    - name: Build Release APK
+      run: flutter build apk --release
+      working-directory: expenses_tracker
+
+    - name: Auto-increment Build Number
+      id: version
+      run: |
+        FILE="expenses_tracker/pubspec.yaml"
+        VERSION_LINE=$(grep '^version:' $FILE)
+        VERSION=$(echo "$VERSION_LINE" | cut -d "+" -f1 | awk '{print $2}')
+        BUILD=$(echo "$VERSION_LINE" | cut -d "+" -f2)
+        NEW_BUILD=$((BUILD + 1))
+        echo "New build: $VERSION+$NEW_BUILD"
+        sed -i "s/^version: .*/version: $VERSION+$NEW_BUILD/" $FILE
+        echo "version=$VERSION+$NEW_BUILD" >> "$GITHUB_OUTPUT"
+
+    - name: Get Latest Commit Info
+      id: commit
+      run: |
+        COMMIT_MSG=$(git log -1 --pretty=%s)
+        COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+        echo "message=$COMMIT_MSG" >> "$GITHUB_OUTPUT"
+        echo "author=$COMMIT_AUTHOR" >> "$GITHUB_OUTPUT"
+
+    - name: Upload Release to GitHub
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: expenses-tracker-v${{ steps.version.outputs.version }}
+        name: 📦 Expense Tracker v${{ steps.version.outputs.version }}
+        body: |
+          📝 **Auto-generated Release**
+          - **Commit Message**: ${{ steps.commit.outputs.message }}
+          - **Author**: ${{ steps.commit.outputs.author }}
+          - **Built by**: GitHub Actions 🚀
+        files: expenses_tracker/build/app/outputs/flutter-apk/app-release.apk
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

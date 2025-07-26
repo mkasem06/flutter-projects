@@ -1,15 +1,39 @@
-# Ignore everything
-*
+# Dart/Pub
+.dart_tool/
+.packages
 
-# But keep these:
-!.gitignore
-!lib/
-!lib/**
-!pubspec.yaml
-!pubspec.lock
-!analysis_options.yaml
-!README.md
+# Flutter
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+generated_plugin_registrant.dart
 
-# Optionally include assets
-!assets/
-!assets/**
+# iOS
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/.symlinks/
+ios/Pods/
+ios/Runner.xcworkspace/
+ios/build/
+
+# Android
+android/.gradle/
+android/build/
+
+windows/
+web/
+macos/
+linux/
+test/
+
+
+
+# VS Code / IntelliJ / Xcode
+.vscode/
+.idea/
+*.iml
+.DS_Store
+
+# Secrets
+*.env
+local.properties

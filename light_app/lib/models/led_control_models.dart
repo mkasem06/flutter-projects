@@ -43,6 +43,7 @@ class LEDState {
   final LightingMode mode;
   final ColorZone currentZone;
   final Map<ColorZone, int> zoneColors;
+  final Map<ColorZone, int> zoneBrightnesses; // Add this
   final List<ColorItem> customColors;
 
   const LEDState({
@@ -51,6 +52,7 @@ class LEDState {
     required this.mode,
     required this.currentZone,
     required this.zoneColors,
+    required this.zoneBrightnesses, // Add this
     required this.customColors,
   });
 
@@ -60,6 +62,7 @@ class LEDState {
     LightingMode? mode,
     ColorZone? currentZone,
     Map<ColorZone, int>? zoneColors,
+    Map<ColorZone, int>? zoneBrightnesses, // Add this
     List<ColorItem>? customColors,
   }) {
     return LEDState(
@@ -68,6 +71,7 @@ class LEDState {
       mode: mode ?? this.mode,
       currentZone: currentZone ?? this.currentZone,
       zoneColors: zoneColors ?? this.zoneColors,
+      zoneBrightnesses: zoneBrightnesses ?? this.zoneBrightnesses, // Add this
       customColors: customColors ?? this.customColors,
     );
   }

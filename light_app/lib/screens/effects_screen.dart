@@ -400,6 +400,9 @@ class _EffectsScreenState extends State<EffectsScreen>
             ...ColorZone.values.map((zone) {
               if (zone == ColorZone.uniform) return const SizedBox.shrink();
 
+              final brightness =
+                  ledProvider.ledState.zoneBrightnesses[zone] ?? 100;
+
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8.0),
                 child: Column(
@@ -410,11 +413,11 @@ class _EffectsScreenState extends State<EffectsScreen>
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                     Slider(
-                      value: ledProvider.brightness.toDouble(),
+                      value: brightness.toDouble(),
                       min: 0,
                       max: 100,
                       divisions: 100,
-                      label: '${ledProvider.brightness}%',
+                      label: '${brightness}%',
                       onChanged: (value) async {
                         await ledProvider.setZoneBrightness(
                             zone, value.round());

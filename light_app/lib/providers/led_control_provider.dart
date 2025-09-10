@@ -61,6 +61,11 @@ class LEDControlProvider extends ChangeNotifier {
       ColorZone.partition1: 0xFFFF0000,
       ColorZone.partition2: 0xFF0000FF,
     },
+    zoneBrightnesses: {
+      ColorZone.uniform: 100,
+      ColorZone.partition1: 100,
+      ColorZone.partition2: 100,
+    },
     customColors: [],
   );
 
@@ -580,19 +585,25 @@ class LEDControlProvider extends ChangeNotifier {
   Future<void> setZoneBrightness(ColorZone zone, int brightness) async {
     final clampedBrightness = brightness.clamp(0, 100);
 
+    final updatedBrightnesses =
+        Map<ColorZone, int>.from(_ledState.zoneBrightnesses);
+    updatedBrightnesses[zone] = clampedBrightness;
+    _ledState = _ledState.copyWith(zoneBrightnesses: updatedBrightnesses);
+    notifyListeners();
+
     try {
       if (zone == ColorZone.partition1 || zone == ColorZone.partition2) {
+        // Get the other zone's brightness to send a complete command
+        final b1 = updatedBrightnesses[ColorZone.partition1] ?? 100;
+        final b2 = updatedBrightnesses[ColorZone.partition2] ?? 100;
+
         // 0x2E raw 0-100 (partition)
         await _sendBrightnessCommand(
           setup: true,
           switchOn: _ledState.isOn,
           type: BRIGHTNESS_MODE_PARTITION,
-          brightness1: zone == ColorZone.partition1
-              ? clampedBrightness
-              : _ledState.brightness,
-          brightness2: zone == ColorZone.partition2
-              ? clampedBrightness
-              : _ledState.brightness,
+          brightness1: b1,
+          brightness2: b2,
           scaleTo255: false,
         );
         // 0x2E scaled 0-255
@@ -601,12 +612,8 @@ class LEDControlProvider extends ChangeNotifier {
           setup: true,
           switchOn: _ledState.isOn,
           type: BRIGHTNESS_MODE_PARTITION,
-          brightness1: zone == ColorZone.partition1
-              ? clampedBrightness
-              : _ledState.brightness,
-          brightness2: zone == ColorZone.partition2
-              ? clampedBrightness
-              : _ledState.brightness,
+          brightness1: b1,
+          brightness2: b2,
           scaleTo255: true,
         );
         // 0x7E fallback (no per-zone on classic, sets global)
@@ -617,12 +624,8 @@ class LEDControlProvider extends ChangeNotifier {
         try {
           final c1 = _ledState.zoneColors[ColorZone.partition1] ?? 0xFFFFFFFF;
           final c2 = _ledState.zoneColors[ColorZone.partition2] ?? 0xFFFFFFFF;
-          final s1 = zone == ColorZone.partition1
-              ? _scaleColor(c1, clampedBrightness)
-              : _scaleColor(c1, _ledState.brightness);
-          final s2 = zone == ColorZone.partition2
-              ? _scaleColor(c2, clampedBrightness)
-              : _scaleColor(c2, _ledState.brightness);
+          final s1 = _scaleColor(c1, b1);
+          final s2 = _scaleColor(c2, b2);
           await _sendColorControlCommand(
             setup: true,
             type: COLOR_MODE_PARTITION,
@@ -630,13 +633,14 @@ class LEDControlProvider extends ChangeNotifier {
             color2: s2,
           );
         } catch (_) {}
+      } else {
+        // If it's the uniform zone, fall back to the global brightness setter
+        await setBrightness(clampedBrightness);
       }
       print('Zone ${zone.displayName} brightness set to: $clampedBrightness%');
     } catch (e) {
       print('Zone brightness command failed: $e');
     }
-
-    notifyListeners();
   }
 
   Future<void> setColor(int color) async {

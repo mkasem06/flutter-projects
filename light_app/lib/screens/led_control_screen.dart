@@ -72,6 +72,11 @@ class _LEDControlScreenState extends State<LEDControlScreen>
                           _buildBrightnessControl(ledProvider),
                           const SizedBox(height: 20),
 
+                          // Zone-specific brightness controls (conditionally shown)
+                          if (ledProvider.ledState.currentZone !=
+                              ColorZone.uniform)
+                            ..._buildZoneBrightnessControls(ledProvider),
+
                           // Lighting Mode Selection
                           _buildModeControl(ledProvider),
                           const SizedBox(height: 20),
@@ -207,6 +212,13 @@ class _LEDControlScreenState extends State<LEDControlScreen>
   }
 
   Widget _buildBrightnessControl(LEDControlProvider ledProvider) {
+    final currentZone = ledProvider.ledState.currentZone;
+    final brightness = ledProvider.ledState.zoneBrightnesses[currentZone] ??
+        ledProvider.ledState.brightness;
+    final title = currentZone == ColorZone.uniform
+        ? 'Brightness'
+        : '${currentZone.displayName} Brightness';
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -218,12 +230,12 @@ class _LEDControlScreenState extends State<LEDControlScreen>
                 const Icon(Icons.brightness_6, color: Colors.orange),
                 const SizedBox(width: 8),
                 Text(
-                  'Brightness',
+                  title,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const Spacer(),
                 Text(
-                  '${ledProvider.brightness}%',
+                  '${brightness}%',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: Colors.orange,
@@ -233,12 +245,70 @@ class _LEDControlScreenState extends State<LEDControlScreen>
             ),
             const SizedBox(height: 12),
             Slider(
-              value: ledProvider.brightness.toDouble(),
+              value: brightness.toDouble(),
               min: 0,
               max: 100,
               divisions: 20,
               onChanged: (value) async {
-                await ledProvider.setBrightness(value.toInt());
+                if (currentZone == ColorZone.uniform) {
+                  await ledProvider.setBrightness(value.toInt());
+                } else {
+                  await ledProvider.setZoneBrightness(
+                      currentZone, value.toInt());
+                }
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildZoneBrightnessControls(LEDControlProvider ledProvider) {
+    return [
+      _buildSingleZoneBrightnessControl(ledProvider, ColorZone.partition1),
+      const SizedBox(height: 16),
+      _buildSingleZoneBrightnessControl(ledProvider, ColorZone.partition2),
+      const SizedBox(height: 20),
+    ];
+  }
+
+  Widget _buildSingleZoneBrightnessControl(
+      LEDControlProvider ledProvider, ColorZone zone) {
+    final brightness = ledProvider.ledState.zoneBrightnesses[zone] ?? 100;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.brightness_auto,
+                    color: Color(
+                        ledProvider.ledState.zoneColors[zone] ?? 0xFFFFFFFF)),
+                const SizedBox(width: 8),
+                Text(
+                  '${zone.displayName} Brightness',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                Text(
+                  '${brightness}%',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ],
+            ),
+            Slider(
+              value: brightness.toDouble(),
+              min: 0,
+              max: 100,
+              divisions: 20,
+              onChanged: (value) async {
+                await ledProvider.setZoneBrightness(zone, value.toInt());
               },
             ),
           ],

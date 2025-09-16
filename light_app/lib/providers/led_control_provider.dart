@@ -57,9 +57,9 @@ class LEDControlProvider extends ChangeNotifier {
     mode: LightingMode.static,
     currentZone: ColorZone.uniform,
     zoneColors: {
-      ColorZone.uniform: 0xFFFFFFFF,
-      ColorZone.partition1: 0xFFFF0000,
-      ColorZone.partition2: 0xFF0000FF,
+      ColorZone.uniform: 0xFF8000FF, // Default to purple instead of white
+      ColorZone.partition1: 0xFF8000FF,
+      ColorZone.partition2: 0xFF8000FF,
     },
     zoneBrightnesses: {
       ColorZone.uniform: 100,
@@ -96,6 +96,17 @@ class LEDControlProvider extends ChangeNotifier {
 
   int getCurrentZoneColor() =>
       _ledState.zoneColors[_ledState.currentZone] ?? 0xFFFFFFFF;
+
+  // Methods for saving and loading state
+  void loadFromSavedState(LEDState savedState) {
+    _ledState = savedState;
+    notifyListeners();
+  }
+
+  void saveCurrentState() {
+    // This will be called by the main app when lifecycle changes
+    // The actual saving is handled by SettingsService
+  }
 
   void _initializeState() {
     // Initialize with default custom colors (reverse engineered from APK)

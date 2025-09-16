@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/led_control_provider.dart';
 import '../providers/bluetooth_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/settings_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,7 +16,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _savePreferences = true;
   bool _notificationsEnabled = true;
   String _selectedTheme = 'System';
-  String _selectedProtocol = '0x2E Packet'; // '0x2E Packet' or 'Classic 0x7E'
+  String _selectedProtocol = '0x2E Packet';
 
   @override
   void initState() {
@@ -24,26 +24,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _loadSettings();
   }
 
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
+  void _loadSettings() {
     setState(() {
-      _autoConnect = prefs.getBool('auto_connect') ?? false;
-      _savePreferences = prefs.getBool('save_preferences') ?? true;
-      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
-      _selectedTheme = prefs.getString('selected_theme') ?? 'System';
-      final proto = prefs.getString('ble_protocol') ?? '2E';
+      _autoConnect = SettingsService.getAutoConnect();
+      _savePreferences = SettingsService.getSavePreferences();
+      _notificationsEnabled = SettingsService.getNotificationsEnabled();
+      _selectedTheme = SettingsService.getSelectedTheme();
+      final proto = SettingsService.getBleProtocol();
       _selectedProtocol = proto == '7E' ? 'Classic 0x7E' : '0x2E Packet';
     });
   }
 
   Future<void> _saveSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('auto_connect', _autoConnect);
-    await prefs.setBool('save_preferences', _savePreferences);
-    await prefs.setBool('notifications_enabled', _notificationsEnabled);
-    await prefs.setString('selected_theme', _selectedTheme);
-    await prefs.setString(
-        'ble_protocol', _selectedProtocol == 'Classic 0x7E' ? '7E' : '2E');
+    await Future.wait([
+      SettingsService.setAutoConnect(_autoConnect),
+      SettingsService.setSavePreferences(_savePreferences),
+      SettingsService.setNotificationsEnabled(_notificationsEnabled),
+      SettingsService.setSelectedTheme(_selectedTheme),
+      SettingsService.setBleProtocol(
+          _selectedProtocol == 'Classic 0x7E' ? '7E' : '2E'),
+    ]);
   }
 
   @override
@@ -69,7 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 24),
 
                 // About Section
-                _buildAboutSection(),
+                _buildAboutSection(ledProvider),
               ],
             ),
           );
@@ -108,7 +108,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _autoConnect = value;
                 });
                 _saveSettings();
+
+                // Enable/disable auto-connect in the Bluetooth provider
+                bluetoothProvider.setAutoConnectEnabled(value);
+
+                // If auto-connect is enabled and we have a last device, try to connect
+                if (value) {
+                  final lastDeviceId =
+                      SettingsService.getLastConnectedDeviceId();
+                  if (lastDeviceId != null) {
+                    bluetoothProvider.setLastDeviceForAutoConnect(lastDeviceId);
+                    bluetoothProvider.attemptAutoConnect();
+                  }
+                }
               },
+            ),
+            ListTile(
+              title: const Text('BLE Protocol'),
+              subtitle: Text(_selectedProtocol),
+              trailing: DropdownButton<String>(
+                value: _selectedProtocol,
+                items: ['0x2E Packet', 'Classic 0x7E']
+                    .map((protocol) => DropdownMenuItem(
+                          value: protocol,
+                          child: Text(protocol),
+                        ))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedProtocol = value;
+                    });
+                    _saveSettings();
+                  }
+                },
+              ),
             ),
             ListTile(
               title: const Text('Connected Device'),
@@ -201,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildAboutSection() {
+  Widget _buildAboutSection(LEDControlProvider ledProvider) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -250,11 +284,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           onPressed: () => Navigator.pop(context, false),
                           child: const Text('Cancel'),
                         ),
-                        ElevatedButton(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.red,
-                            foregroundColor: Colors.white,
-                          ),
+                        TextButton(
                           onPressed: () => Navigator.pop(context, true),
                           child: const Text('Reset'),
                         ),
@@ -262,13 +292,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                   );
 
-                  if (confirmed == true && mounted) {
-                    final ledProvider = context.read<LEDControlProvider>();
+                  if (confirmed == true) {
+                    // Clear LED settings from storage
+                    await SettingsService.clearLedSettings();
+
+                    // Reset the LED provider to factory defaults
                     await ledProvider.factoryReset();
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                            content: Text('Factory reset completed')),
+                          content:
+                              Text('LED settings reset to factory defaults'),
+                        ),
                       );
                     }
                   }

@@ -51,6 +51,141 @@ class BluetoothProvider extends ChangeNotifier {
     _initialize();
   }
 
+  // Auto-connect support
+  String? _lastDeviceIdForAutoConnect;
+  Timer? _autoConnectTimer;
+  Timer? _reconnectTimer;
+  bool _autoConnectEnabled = false;
+
+  void setLastDeviceForAutoConnect(String deviceId) {
+    _lastDeviceIdForAutoConnect = deviceId;
+  }
+
+  void setAutoConnectEnabled(bool enabled) {
+    _autoConnectEnabled = enabled;
+    if (enabled && _lastDeviceIdForAutoConnect != null && !_isConnected) {
+      // Start auto-connect with delay to allow initialization
+      _scheduleAutoConnect();
+    } else if (!enabled) {
+      _cancelAutoConnect();
+    }
+  }
+
+  void _scheduleAutoConnect({Duration delay = const Duration(seconds: 2)}) {
+    _autoConnectTimer?.cancel();
+    _autoConnectTimer = Timer(delay, () {
+      if (_autoConnectEnabled && !_isConnected) {
+        attemptAutoConnect();
+      }
+    });
+  }
+
+  void _cancelAutoConnect() {
+    _autoConnectTimer?.cancel();
+    _reconnectTimer?.cancel();
+  }
+
+  void _scheduleReconnect({Duration delay = const Duration(seconds: 5)}) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(delay, () {
+      if (_autoConnectEnabled &&
+          !_isConnected &&
+          _lastDeviceIdForAutoConnect != null) {
+        debugPrint('Attempting reconnection...');
+        attemptAutoConnect();
+      }
+    });
+  }
+
+  Future<void> attemptAutoConnect() async {
+    if (_lastDeviceIdForAutoConnect == null ||
+        _isConnected ||
+        !_autoConnectEnabled) {
+      return;
+    }
+
+    debugPrint(
+        'Attempting auto-connect to device: $_lastDeviceIdForAutoConnect');
+
+    try {
+      // Ensure Bluetooth is enabled first
+      if (!await isBluetoothEnabled()) {
+        debugPrint('Bluetooth not enabled, cannot auto-connect');
+        return;
+      }
+
+      await requestPermissions();
+
+      // Try to find the device in system bonded devices first
+      final bondedDevices = await FlutterBluePlus.bondedDevices;
+      BluetoothDevice? targetDevice;
+
+      try {
+        targetDevice = bondedDevices.firstWhere(
+          (device) => device.remoteId.str == _lastDeviceIdForAutoConnect,
+        );
+        debugPrint('Found bonded device: ${targetDevice.platformName}');
+      } catch (e) {
+        debugPrint('Device not found in bonded devices, starting scan...');
+      }
+
+      if (targetDevice != null) {
+        final success = await connectToDevice(targetDevice);
+        if (success) {
+          debugPrint('Auto-connect successful');
+          return;
+        }
+      }
+
+      // If bonded device connection failed, try scanning
+      debugPrint('Scanning for device...');
+      await _scanForAutoConnectDevice();
+    } catch (e) {
+      debugPrint('Auto-connect failed: $e');
+      // Retry auto-connect after delay if still enabled
+      if (_autoConnectEnabled) {
+        _scheduleAutoConnect(delay: const Duration(seconds: 10));
+      }
+    }
+  }
+
+  Future<void> _scanForAutoConnectDevice() async {
+    if (_isScanning) return;
+
+    try {
+      _devices.clear();
+      _isScanning = true;
+      notifyListeners();
+
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+
+      // Listen for scan results and try to connect when target device is found
+      final subscription = FlutterBluePlus.scanResults.listen((results) {
+        for (ScanResult result in results) {
+          if (result.device.remoteId.str == _lastDeviceIdForAutoConnect) {
+            debugPrint(
+                'Found target device during scan: ${result.device.platformName}');
+            // Stop scanning and connect
+            FlutterBluePlus.stopScan();
+            connectToDevice(result.device);
+            return;
+          }
+        }
+      });
+
+      // Wait for scan to complete
+      await Future.delayed(const Duration(seconds: 10));
+      await subscription.cancel();
+
+      _isScanning = false;
+      notifyListeners();
+    } catch (e) {
+      _isScanning = false;
+      notifyListeners();
+      debugPrint('Scan for auto-connect failed: $e');
+    }
+  }
+
   Future<void> _initialize() async {
     // Get initial state
     _bluetoothState = await FlutterBluePlus.adapterState.first;
@@ -171,9 +306,19 @@ class BluetoothProvider extends ChangeNotifier {
 
       // Listen for connection state changes
       _connectionSubscription = device.connectionState.listen((state) {
+        final wasConnected = _isConnected;
         _isConnected = state == BluetoothConnectionState.connected;
-        if (!_isConnected) {
+
+        if (wasConnected && !_isConnected) {
+          // Connection was lost
+          debugPrint('Connection lost, cleaning up...');
           _cleanup();
+
+          // Schedule reconnection if auto-connect is enabled
+          if (_autoConnectEnabled && _lastDeviceIdForAutoConnect != null) {
+            debugPrint('Scheduling reconnection attempt...');
+            _scheduleReconnect();
+          }
         }
         notifyListeners();
       });
@@ -384,6 +529,7 @@ class BluetoothProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _cancelAutoConnect();
     stopDiscovery();
     disconnect();
     _responseController.close();
